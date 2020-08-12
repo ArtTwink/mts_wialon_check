@@ -3,14 +3,14 @@ from openpyxl import load_workbook
 sdk = WialonSdk(
     is_development=True,
     scheme='https',
-    host='maps.baltgps.ru',
+    host='************',
     port=0,
     session_id='',
     extra_params={}
 )
-token = "4c0646a576604f545368e8187177098fBB0550C4B2647584535F2EA745811639516044F9"
+token = "***************"
 response = sdk.login(token)
-wb = load_workbook(filename='gor_jun.xlsx', data_only=True)
+wb = load_workbook(filename='**********', data_only=True)
 wb.active = 0
 ws = wb.active
 number_of_rows = 101
