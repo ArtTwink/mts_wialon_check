@@ -1,0 +1,99 @@
+from wialon.sdk import WialonSdk, WialonError, SdkException
+from openpyxl import load_workbook
+sdk = WialonSdk(
+    is_development=True,
+    scheme='https',
+    host='maps.baltgps.ru',
+    port=0,
+    session_id='',
+    extra_params={}
+)
+token = "4c0646a576604f545368e8187177098fBB0550C4B2647584535F2EA745811639516044F9"
+response = sdk.login(token)
+wb = load_workbook(filename='gor_jun.xlsx', data_only=True)
+wb.active = 0
+ws = wb.active
+number_of_rows = 101
+for i in range(2, number_of_rows):
+    ph = ws['A'+str(i)].value
+    if len(str(ph)) == 12:
+        ph = ph
+    else:
+        ph = str('+' + str(ph))
+    try:
+        parameters = {
+            'spec': {
+                'itemsType': "avl_unit",
+                'propName': "sys_phone_number",
+                'propValueMask': ph,
+                'sortType': "sys_phone_number",
+            },
+            'force': 1,
+            'flags': 257,
+            'from': 0,
+            'to': 0
+        }
+        units = sdk.core_search_items(parameters)['items']
+        item = units[0]
+        name_of_object = str(item["nm"].replace("/",""))
+        hardware = str(item["hw"])
+        object_id = str(item["id"])
+        parameters = {"filterType": "id", "filterValue": [hardware]}
+        answer = sdk.core_get_hw_types(parameters)
+        DeviceName = str(answer[0]['name'])
+        str_i = str(i)
+        parameters = {
+            'spec': {
+                'itemsType': "avl_unit_group",
+                'propName': "",
+                'propValueMask': object_id,
+                'sortType': "",
+            },
+            'force': 1,
+            'flags': 1,
+            'from': 0,
+            'to': 0
+        }
+        group_units = sdk.core_search_items(parameters)
+        list_of_items = group_units['items']
+        group_name = []
+        for x in list_of_items:
+            cars_list = x["u"]
+            b = cars_list.count(int(object_id))
+            if b > 0:
+                group = x["nm"].replace("/","").replace("[","").replace("{","").replace("]","").replace("}","").replace("!","")
+                group_name.append(group)
+
+        import datetime as DT
+        t1 = DT.datetime.strptime('2020-7-1 00:00:00', '%Y-%m-%d %H:%M:%S')
+        t2 = DT.datetime.strptime('2020-8-1 00:00:00', '%Y-%m-%d %H:%M:%S')
+        time_from = t1.timestamp() + 7200
+        time_to = t2.timestamp() + 7200
+        params = {"reportResourceId": 16512, "reportTemplateId": 3, "reportObjectId": int(object_id),
+                  "reportObjectSecId": 0, "interval": {"from": int(time_from), "to": int(time_to), "flags": 1}}
+        report = sdk.report_exec_report(params)
+        sms_count = report["reportResult"]['stats'][1][1]
+        mileage = report["reportResult"]['stats'][2][1].replace("km","").replace(" ","")
+        params = {"tableIndex": 0, "indexFrom": 0, "indexTo": 0}
+        gprs = sdk.report_get_result_rows(params)
+        gprs_traffic = float(gprs[0]["c"][2].replace("MB","").replace(" ","").replace("'",""))
+
+        MyObject = {"Телефон": ph, "Название": name_of_object, "Тип блока": DeviceName, "Группы": group_name,
+                    "Сообщений": sms_count, "Пробег": mileage, "Трафик": gprs_traffic}
+
+        ws['B' + str(i)] = name_of_object
+        ws['C' + str(i)] = DeviceName
+        ws['D' + str(i)] = ', '.join(group_name)
+        ws['E' + str(i)] = int(sms_count)
+        ws['F' + str(i)] = float(mileage)
+        ws['G' + str(i)] = gprs_traffic
+        wb.save('gor_jun.xlsx')
+
+    except SdkException as e:
+        print(f'Sdk related error: {e}')
+    except WialonError as e:
+        print(f'Wialon related error: {e}')
+    except Exception as e:
+        print(f'Python error: {e}')
+wb.save('gor_jun.xlsx')
+wb.close()
